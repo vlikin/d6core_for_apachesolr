@@ -1,0 +1,271 @@
+<?php
+/**
+ * @file
+ * Integerate the site search system with the Apach Solr search service.
+ */
+
+define('LV_SEARCH_PATH', 'search_results/');
+
+/**
+ * Store module variables.
+ */
+function lv_search_obj() {
+  static $obj = NULL;
+  if ($obj == NULL) {
+    $obj = new stdClass();
+
+    // Used content types.
+    $obj->content_types = array(
+      'all',
+      'article',
+      'product',
+      'news',
+    );
+
+    // The content type wich is searched.
+    $obj->as_content_type = NULL;
+
+    // Additional fields to index in ApacheSolr.
+    $obj->fields_to_index = array(
+      'product' => array(
+        'field_product_image' => array(
+          'type' => 'file',
+          'index_as' => 'sm',
+        ),
+      ),
+      'article' => array(
+        'field_article_image' => array(
+          'type' => 'file',
+          'index_as' => 'sm',
+        ),
+      ),
+      'news' => array(
+        'field_news_image' => array(
+          'type' => 'file',
+          'index_as' => 'sm',
+        ),
+      ),
+    );
+  }
+  return $obj;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function lv_search_theme() {
+
+  // Defining.
+  $theme_code_names = array(
+    'lv_search_result_left',
+    'lv_search_result_main_all',
+    'lv_search_result_main_article',
+    'lv_search_result_main_news',
+    'lv_search_result_main_product',
+  );
+
+  // Proccessing.
+  $themes = array();
+  foreach ($theme_code_names as $code_name) {
+    $themes[$code_name] = array(
+      'arguments' => array(
+        'data' => NULL,
+      ),
+      'template' => 'theme/' . $code_name,
+    );
+  }
+  return $themes;
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function lv_search_ctools_plugin_directory($module, $plugin) {
+  if (($module == 'ctools') || ($module == 'panels')) {
+    return 'plugins/' . $plugin;
+  }
+}
+
+/**
+ * Implements hook_init().
+ */
+function lv_search_init() {
+  if (arg(0) == 'search_results') {
+    drupal_add_css(LV_THEME_PATH . '/css/page-search.css');
+  }
+}
+
+/**
+ * Wrapped apache search function to add aditional logic.
+ */
+function lv_search_execute($search, $content_type, $rows = 10) {
+
+  // Main purpose of this function is a searching by exact content types.
+  if ($content_type == NULL) {
+    return NULL;
+  }
+
+  // Try to exclude code warnings.
+  $search_initial = array(
+    'keys' => '',
+    'filters' => '',
+    'sort' => '',
+    'path' => '',
+    'page' => 0,
+  );
+  $search = array_merge($search_initial, $search);
+
+  // Define what the content type we try to process.
+  $obj = lv_search_obj();
+  $obj->as_content_type = $content_type;
+  $obj->as_params = array(
+    'rows' => $rows,
+  );
+  $result = NULL;
+
+  // Try to proccess a search.
+  try {
+    $result = apachesolr_search_execute($search['keys'], $search['filters'], $search['sort'], $search['path'], $search['page']);
+  }
+  catch (Exception $e) {
+    watchdog('Apache Solr', nl2br(check_plain($e->getMessage())), NULL, WATCHDOG_ERROR);
+    apachesolr_failure(t('Solr search'), $search['keys']);
+  }
+
+  // Get a current query to get the total count.
+  $num_found = 0;
+  if (apachesolr_has_searched() && ($response = apachesolr_static_response_cache())) {
+    $num_found = $response->response->numFound;
+  }
+
+  // Switch of the Apache Solr semaphore.
+  $obj->as_content_type = NULL;
+  $obj->as_params = array();
+  return array(
+    'result' => $result,
+    'num_found' => $num_found,
+  );
+}
+
+/**
+ * Definition of the top search form.
+ */
+function lv_search_form(&$form_state) {
+  $form = array(
+    '#attributes' => array(
+      'class' => 'search',
+    ),
+    'keys' => array(
+      '#type' => 'textfield',
+      '#size' => 30,
+      '#attributes' => array(
+        'class' => 'form-text field-search',
+        'type' => 'text',
+        'title' => t('Rechercher...'),
+        'placeholder' => t('Rechercher...'),
+      ),
+    ),
+    'submit' => array(
+      '#type' => 'submit',
+      '#value' => t('Rechercher...'),
+    ),
+  );
+  return $form;
+}
+
+/**
+ * Process submit data of the top search form.
+ */
+function lv_search_form_submit($form, &$form_state) {
+
+  // Redirect to the search results page.
+  $redirect_to = LV_SEARCH_PATH . 'all/' . urlencode($form_state['values']['keys']);
+  drupal_goto($redirect_to);
+}
+
+
+/**
+ * Implements hook_apachesolr_modify_query().
+ */
+function lv_search_apachesolr_modify_query(&$query, &$params, $caller) {
+  $obj = lv_search_obj();
+  $params['rows'] = $obj->as_params['rows'];
+
+  // Inject CCK parameters.
+  if ($obj->as_content_type != NULL) {
+
+    // Select needed fields.
+    if (array_key_exists($obj->as_content_type, $obj->fields_to_index)) {
+      $fields = $obj->fields_to_index[$obj->as_content_type];
+      if (is_array($fields)) {
+        $indexes = array();
+        foreach ($fields as $field_name => $field) {
+          $indexes[] = $field['index_as'] . '_' . $field_name;
+        }
+        $fl = join(',', $indexes);
+      }
+    }
+
+    // Set fields.
+    $params['fl'] .= ',' . $fl;
+
+    // Add tags to the product content type.
+    if ($obj->as_content_type == 'product') {
+      $params['fl'] .= ',vid,ts_vid_1_names';
+    }
+
+    // Add teaser to article, news content types.
+    if (in_array($obj->as_content_type, array('article', 'news'))) {
+      $params['fl'] .= ',teaser';
+    }
+
+    // Add filter. Filter by content type.
+    $query->add_filter('type', $obj->as_content_type);
+  }
+}
+
+/**
+ * Implements hook_apachesolr_update_index().
+ */
+function lv_search_apachesolr_update_index(&$document, $node) {
+
+  // Get fields to index.
+  $obj = lv_search_obj();
+  $content_types_names = array_keys($obj->fields_to_index);
+
+  // If we are not needed to index this node(this content type).
+  if (!in_array($node->type, $content_types_names)) {
+    return;
+  }
+
+  // Loop fields of the content type to index.
+  foreach ($obj->fields_to_index[$node->type] as $field_name => $field) {
+    $node_as_array = (array) $node;
+
+    // Try to omit unexisted fields.
+    if (!key_exists($field_name, $node_as_array)) {
+      continue;
+    }
+    $value = $node_as_array[$field_name];
+
+    // Try to index.
+    if ($field['type'] == 'file') {
+
+      // Index a single value.
+      if (count($value) == 1 and (is_array($value[0]) and array_key_exists('fid', $value[0]))) {
+        $index = $field['index_as'] . '_' . $field_name;
+        $document->setMultiValue($index, $value[0]['filepath']);
+      }
+
+      // Index an array.
+      if (count($value) > 1) {
+        for ($i = 0; $i < count($value); $i++) {
+          if (array_key_exists('fid', $value[$i])) {
+            $index = $field['index_as'] . '_' . $field_name . '_' . $i;
+            $document->setMultiValue($index, $value[$i]['filepath']);
+          }
+        }
+      }
+    }
+  }
+}

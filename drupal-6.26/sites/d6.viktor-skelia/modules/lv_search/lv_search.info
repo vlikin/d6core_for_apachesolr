@@ -1,0 +1,8 @@
+name = "LV search"
+description = "Integerate the site search system with the Apach Solr search service."
+package = Laboratoires Vendome
+dependencies[] = "panels"
+dependencies[] = "apachesolr_search"
+dependencies[] = "nodequeue"
+version = "6.x-1.0"
+core = 6.x
