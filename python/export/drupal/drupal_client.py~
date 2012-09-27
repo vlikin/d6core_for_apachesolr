@@ -1,0 +1,23 @@
+import xmlrpclib
+from drupal.drupal_transport import DrupalTransport
+class DrupalClient(xmlrpclib.ServerProxy):
+    proxy = None
+    session = None
+    def __init__(self, uri, proxy, allow_none):
+        transport = DrupalTransport()
+        transport.set_proxy("localhost:8080")
+        xmlrpclib.ServerProxy.__init__(self, uri = uri, transport = transport, allow_none = allow_none)
+    
+    def login(self, username, password):    
+        session = self.user.login(username, password)
+        self.set_session(session)
+        return session
+    
+    def set_session(self, session):
+        self.session = session
+        self._ServerProxy__transport.set_session(self.session)
+    
+    def connect(self):
+        session = self.system.connect()
+        self.set_session(session)
+        return session

@@ -1,0 +1,92 @@
+import os, sys, os.path, time, mimetypes, xmlrpclib, base64
+from drupal.drupal_client import DrupalClient
+
+
+class drupal_services_import:
+	
+	server = None
+	url = ""
+	session = None
+	username = ""
+	password =""
+	
+	def __init__(self, url, username, password):
+		self.url = url
+		self.username = username
+		self.password = password
+		self.server = DrupalClient(self.url, allow_none = True,  proxy = "localhost:8080");
+		self.session = self.server.login(self.username, self.password);
+		return
+		
+	def load_file(self, path):
+		filename = os.path.basename(path)
+		timestamp = str(int(time.time()))
+		filesize = os.stat(path).st_size
+		filemime = mimetypes.guess_type(path)
+		file = open(path, 'rb')
+		data = file.read()
+		file.close()	
+		return {
+			"filename": filename,
+			"filesize": filesize,
+			"filemime": filemime,
+			"data": data
+		}
+	
+	def ff(self):
+		timestamp = str(int(time.time()))
+		node = {
+			'type': 'page',
+			'status': 1,
+			'title': 'Remote Test ' + timestamp,
+			'uid': self.session['user']['uid'],
+			'name': self.session['user']['name'],
+			'changed': timestamp,
+		}
+		return self.server.node.create(node)
+
+	def send_file(self, path):
+		file = self.load_file(path)
+		timestamp = str(int(time.time()))
+		obj = {
+	   		'file': base64.b64encode(file["data"]),
+    		'filename': file["filename"],
+    		'filepath': 'public://tmp/' + file["filename"],
+			'filesize': file["filesize"],
+    		'timestamp': timestamp,
+  			'uid': self.session['user']['uid'],
+    		'filemime': file['filemime'],
+		}
+		created_file_short = self.server.file.create(obj)
+		created_file = self.server.file.retrieve(created_file_short)
+		del created_file['file']
+		node_file = {
+     		'fid': created_file_short['fid'],
+        	'filemime': file['filemime'],
+         	'filename': created_file['filename'],
+          	'filepath': created_file['filepath'],
+           	'filesize': file["filesize"],
+        	'status': '1',
+     	   	'timestamp': timestamp,
+      	   	'uid': self.session['user']['uid'],
+    	}
+		
+		node = {
+			'type': 'page',
+			'status': 1,
+			'title': 'Remote Test ' + timestamp,
+			'uid': self.session['user']['uid'],
+			'name': self.session['user']['name'],
+			'changed': timestamp,
+			'field_e_good_image':[
+								node_file
+			]
+		}
+		print  self.server.node.create(node)
+		
+		
+
+		
+
+
+		
