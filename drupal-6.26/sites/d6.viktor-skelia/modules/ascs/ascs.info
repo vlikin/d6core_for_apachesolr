@@ -1,0 +1,6 @@
+name = "Apache Solr Content Search (ASCS)"
+description = "Integerate the site search system with the Apach Solr search service."
+package = "Apache Solr"
+dependencies[] = "apachesolr_search"
+version = "6.x-1.0"
+core = 6.x

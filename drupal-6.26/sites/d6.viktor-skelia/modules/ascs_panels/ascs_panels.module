@@ -1,0 +1,9 @@
+<?php
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function ascs_panels_ctools_plugin_directory($module, $plugin) {
+  if (($module == 'ctools') || ($module == 'panels')) {
+    return 'plugins/' . $plugin;
+  }
+}

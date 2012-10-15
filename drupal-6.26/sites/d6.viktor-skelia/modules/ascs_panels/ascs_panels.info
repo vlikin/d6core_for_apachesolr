@@ -1,0 +1,7 @@
+name = "Panels with Apache Solr Content Search (ASCS)"
+description = "It integrates the Panels module with the Apache Solr Content Search module."
+package = "Apache Solr"
+dependencies[] = "panels"
+dependencies[] = "ascs"
+version = "6.x-1.0"
+core = 6.x
