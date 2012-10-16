@@ -58,20 +58,84 @@ function ascs_menu() {
     'admin/settings/apachesolr/ascs' => array(
       'title' => 'ASCS content settings',
       'description' => 'It defines fields to be indexed.',
-      'page callback' => 'ascs_admin_content_settings_page',
-      'access callback' => TRUE,
-      //'access arguments' => array('administer site configuration') ,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('ascs_admin_content_settings_page'),
+      'type' => MENU_LOCAL_TASK,
+      'access arguments' => array('Administer search (ASCS)') ,
     ),
   );
 }
 
 /**
- * It defines the admin settings form.
+ * Implementation of hook_perm().
  */
-function ascs_admin_content_settings_page() {
-  return "admin  page...";
+function ascs_perm() {
+  return array('Administer search (ASCS)');
 }
 
+/**
+ * It defines the admin settings form.
+ */
+function ascs_admin_content_settings_form() {
+  $form = array(
+    '#tree' => TRUE,
+  );
+
+  // It gets the cck structure data.
+  $types = node_get_types('types');
+  $fields_info = _content_type_info();
+
+  // It remaps data.
+  foreach($fields_info['fields'] as $field_name => $field) {
+    $type = $types[$field['type_name']];
+    if (!property_exists($type, 'fields')) {
+      $type->fields = array();
+    }
+    $type->fields[$field_name] = $field;
+  }
+
+  // It retrieves settings.
+  $settings = variable_get('ascs_content_type_list', array());
+
+  //It builds the form.
+  foreach($types as $type_name => $type) {
+    $field_set = array(
+      '#title' => $type->name,
+      '#type' => 'fieldset',
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+    );
+    if (!property_exists($type, 'fields')) {
+      continue;
+    }
+    foreach($type->fields as $field_key => $field) {
+      $value = 0;
+      if (array_key_exists($type_name, $settings) && array_key_exists($field_key, $settings[$type_name])) {
+        $value = $settings[$type_name][$field_key];
+      }
+      $form_item = array(
+        '#title' => $field_key,
+        '#type' => 'checkbox',
+        '#value' => $value,
+      );
+      $field_set[$field_key] = $form_item;
+    }
+    $form[$type_name] = $field_set;
+    $form['buttons'] = array(
+      'submit' => array(
+        '#type' => 'submit',
+        '#value' => t('Save configuration'),
+      ),
+    );
+  }
+  return $form;
+}
+/**
+ * It implements the submition function of ascs_admin_content_settings_form form.
+ */
+function ascs_admin_content_settings_form_submit($form, &$form_state) {
+  variable_set('ascs_content_type_list', $form_state['values']);
+}
 /**
  * Implements hook_theme().
  */
