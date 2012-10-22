@@ -62,7 +62,6 @@ function ascs_panels_ascs_panels_form_admin_title($subtype, $conf, $context) {
  * Render callback.
  */
 function ascs_panels_ascs_panels_form_render($subtype, $conf, $panel_args, $context) {
-  dpm(func_get_args());
   $block = new stdClass();
   $block->content = drupal_get_form('ascs_panels_ascs_panels_form__form', $conf);
   return $block;
@@ -72,12 +71,11 @@ function ascs_panels_ascs_panels_form_render($subtype, $conf, $panel_args, $cont
  * It defines a search form.
  */
 function ascs_panels_ascs_panels_form__form(&$form_state, $conf) {
-  dpm(func_get_args());
   $form = array(
     '#attributes' => array(
       'class' => 'search',
     ),
-    'keys' => array(
+    'keywords' => array(
       '#type' => 'textfield',
       '#size' => 30,
       '#attributes' => array(
@@ -86,6 +84,7 @@ function ascs_panels_ascs_panels_form__form(&$form_state, $conf) {
         'title' => t('Search form'),
         'placeholder' => t('Keywords, ...'),
       ),
+      '#default_value' => $form_state['values']['keywords']
     ),
     'path_pattern' => array(
       '#type' => 'hidden',
@@ -101,11 +100,10 @@ function ascs_panels_ascs_panels_form__form(&$form_state, $conf) {
 
 
 /**
- * Process submit data of the search form.
+ * It processes submit data of the search form.
  */
 function ascs_panels_ascs_panels_form__form_submit($form, &$form_state) {
-dpm(func_get_args());
   // Redirect to the search results page.
-  $redirect_to = ascs_PATH . 'all/' . urlencode($form_state['values']['keys']);
+  $redirect_to = str_replace(":keywords", urlencode($form_state['values']['keywords']), $form_state['values']['path_pattern']);
   drupal_goto($redirect_to);
 }
