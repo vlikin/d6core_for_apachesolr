@@ -4,8 +4,6 @@
  * Integerate the site search system with the Apach Solr search service.
  */
 
-define('ASCS_PATH', 'search_results/');
-
 /**
  * Store module variables.
  */
@@ -223,43 +221,6 @@ function ascs_execute($search, $content_type, $rows = 10) {
     'num_found' => $num_found,
   );
 }
-
-/**
- * Definition of the top search form.
- */
-function ascs_form(&$form_state) {
-  $form = array(
-    '#attributes' => array(
-      'class' => 'search',
-    ),
-    'keys' => array(
-      '#type' => 'textfield',
-      '#size' => 30,
-      '#attributes' => array(
-        'class' => 'form-text field-search',
-        'type' => 'text',
-        'title' => t('Rechercher...'),
-        'placeholder' => t('Rechercher...'),
-      ),
-    ),
-    'submit' => array(
-      '#type' => 'submit',
-      '#value' => t('Rechercher...'),
-    ),
-  );
-  return $form;
-}
-
-/**
- * Process submit data of the top search form.
- */
-function ascs_form_submit($form, &$form_state) {
-
-  // Redirect to the search results page.
-  $redirect_to = ascs_PATH . 'all/' . urlencode($form_state['values']['keys']);
-  drupal_goto($redirect_to);
-}
-
 
 /**
  * Implements hook_apachesolr_modify_query().
